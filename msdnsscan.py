@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import dns.resolver
 import sys
 from colorama import Fore, Style, init
@@ -13,6 +12,7 @@ def style():
 record_types = ['A', 'AAAA', 'NS', 'CNAME', 'MX', 'PTR', 'SOA', 'SRV',
                 'TXT', 'DNSKEY', 'DNSKEYNSEC', 'NSEC3', 'NSEC3PARAM', 'RRSIG']
 
+
 def banner():
     print(Fore.YELLOW + Style.BRIGHT + "")
     print('███╗   ███╗███████╗██████╗ ███╗   ██╗███████╗███████╗ ██████╗ █████╗ ███╗   ██╗')
@@ -24,15 +24,15 @@ def banner():
     print('                                   Version 1.0.0                                 ')
     print('                               A project by The Mayor                            ')
     print('                       python3 msdnsscan.py <domain> to start                  \n' + Style.RESET_ALL)
-    print("-" * 79)    
-                                                                                   
+    print("-" * 79)
 
 
 def main():
     try:
         domain = sys.argv[1]
     except IndexError:
-        print(fail + f'\n[warn] You did not enter a domain. Syntax is python3 msdnsscan.py <domain>.')
+        print(
+            fail + f'\n[warn] You did not enter a domain. Syntax is python3 msdnsscan.py <domain>.')
         quit()
     for records in record_types:
         try:
@@ -61,6 +61,6 @@ if __name__ == "__main__":
         banner()
         main()
     except KeyboardInterrupt:
-        print(info + f'\n[warn] You either fat fingered this, or meant to do it. Either way, goodbye!\n')
+        print(
+            info + f'\n[warn] You either fat fingered this, or meant to do it. Either way, goodbye!\n')
         quit()
-
