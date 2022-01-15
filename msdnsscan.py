@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import dns.resolver
 import sys
 from colorama import Fore, Style, init
