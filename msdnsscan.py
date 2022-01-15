@@ -22,17 +22,21 @@ def banner():
     print('╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═══╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝\n')
     print('                                   Version 1.0.0                                 ')
     print('                               A project by The Mayor                            ')
-    print('                        python3 msdnsscan <domain> to start                     \n' + Style.RESET_ALL)
+    print('                       python3 msdnsscan.py <domain> to start                  \n' + Style.RESET_ALL)
     print("-" * 79)    
                                                                                    
 
 
 def main():
-    domain = sys.argv[1]
+    try:
+        domain = sys.argv[1]
+    except IndexError:
+        print(fail + f'\n[warn] You did not enter a domain. Syntax is python3 msdnsscan.py <domain>.')
+        quit()
     for records in record_types:
         try:
             answers = dns.resolver.resolve(domain, records)
-            print(success + f'\n{records} records found.')
+            print(success + f'\n{records} records found')
             print('-' * 50)
             for server in answers:
                 print(success + server.to_text())
@@ -45,6 +49,7 @@ def main():
             pass
         except dns.resolver.NoNameservers:
             pass
+
     print(f'\n[info] DNS enumeration for {domain} completed.\n')
 
 
@@ -57,3 +62,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(info + f'\n[warn] You either fat fingered this, or meant to do it. Either way, goodbye!\n')
         quit()
+
