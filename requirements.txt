@@ -1,0 +1,2 @@
+colorama==0.4.4
+dnspython==2.1.0
