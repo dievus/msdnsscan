@@ -50,6 +50,7 @@ def main():
 
 if __name__ == "__main__":
     try:
+        init()
         style()
         banner()
         main()
