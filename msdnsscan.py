@@ -58,7 +58,7 @@ def main():
 def zone_transfer(address):
     name_server = dns.resolver.resolve(address, 'NS')
     print(
-        info + f'\n[info] Testing discovered name servers for zone transfers. This may take a minute.')
+        info + f'\n[info] Testing name servers for zone transfers. This may take a minute.')
     for server in name_server:
         #print(info + f'Found Name Server: {server}')
         ip_value = dns.resolver.resolve(server.target, 'A')
