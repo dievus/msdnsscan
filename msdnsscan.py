@@ -1,6 +1,8 @@
 import dns.resolver
+import dns.zone
 import sys
 from colorama import Fore, Style, init
+import os
 
 
 def style():
@@ -27,6 +29,7 @@ def banner():
     print("-" * 79)
 
 
+ns_servers = []
 def main():
     try:
         domain = sys.argv[1]
@@ -37,7 +40,7 @@ def main():
     for records in record_types:
         try:
             answers = dns.resolver.resolve(domain, records)
-            print(success + f'\n{records} records found')
+            print(info + f'\n{records} Records')
             print('-' * 50)
             for server in answers:
                 print(success + server.to_text())
@@ -51,7 +54,28 @@ def main():
         except dns.resolver.NoNameservers:
             pass
 
-    print(f'\n[info] DNS enumeration for {domain} completed.\n')
+
+def zone_transfer(address):
+    name_server = dns.resolver.resolve(address, 'NS')
+    print(
+        info + f'\n[info] Testing discovered name servers for zone transfers. This may take a minute.')
+    for server in name_server:
+        #print(info + f'Found Name Server: {server}')
+        ip_value = dns.resolver.resolve(server.target, 'A')
+        for ip_addr in ip_value:
+            try:
+                z_transfer = dns.zone.from_xfr(dns.query.xfr(str(ip_addr), address))
+                print(
+                    info + f'\nZone transfer records for {server} at {ip_addr}')
+                print('-' * 60)
+                for z_host in z_transfer:
+                    print(success + z_host.to_text())
+            except dns.xfr.TransferError:
+                print(info + f'\n[info] Zone Transfer refused for {server}')
+                pass
+            except TimeoutError:
+                print(info + f'\n[info] Zone Transfer refused for {server}')
+                pass
 
 
 if __name__ == "__main__":
@@ -60,6 +84,9 @@ if __name__ == "__main__":
         style()
         banner()
         main()
+        domain = sys.argv[1]
+        zone_transfer(domain)
+        print(info + f'\n[info] DNS enumeration for {domain} completed.\n')
     except KeyboardInterrupt:
         print(
             info + f'\n[warn] You either fat fingered this, or meant to do it. Either way, goodbye!\n')
