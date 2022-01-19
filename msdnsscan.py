@@ -52,7 +52,7 @@ def banner():
     print('                        DNS and Subdomain Enumeration Tool                     ')
     print('                                   Version 1.0.0                               ')
     print('                               A project by The Mayor                          ')
-    print('                       python3 msdnsscan.py <domain> to start                \n' + Style.RESET_ALL)
+    print('                    python3 msdnsscan.py -d <domain> -a to start             \n' + Style.RESET_ALL)
     print("-" * 79)
 
 
