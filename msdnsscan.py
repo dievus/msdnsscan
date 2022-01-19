@@ -13,11 +13,11 @@ def options():
 Example: python3 msdnsscan.py -d example.com -s
 '''))
     opt_parser.add_argument(
-        '-d', '--domain', help='Checks A, AAAA, NS, CNAME, MX, PTR, SOA, SRV, and TXT records.', required=True)
+        '-d', '--domain', help='Specifies the domain name to test', required=True)
     opt_parser.add_argument(
         '-a', '--all', help='Scans for DNS records, zone transfers, and subdomains', action='store_true')
     opt_parser.add_argument(
-        '-dn', '--dns', help='Checks DNS records', action='store_true')
+        '-dn', '--dns', help='Checks A, AAAA, NS, CNAME, MX, PTR, SOA, SRV, and TXT records', action='store_true')
     opt_parser.add_argument(
         '-s', '--subdom', help='Includes check for subdomains in scan', action='store_true')
     opt_parser.add_argument(
