@@ -19,6 +19,15 @@ Change directories to msdnsscan and run:
 
 This will run the install script to add necessary dependencies to your system.
 
-```python3 msdnsscan.py <domain>```
+```python3 msdnsscan.py -d <domain> <options>```
+
+Options include:
+ ```-dn, --dns - checks DNS records```
+ 
+ ```-z, --zone - checks Zone Transfer records```
+ 
+ ```-s, --subdom - checks for subdomains```
+ 
+ ```-a, --all - runs all checks```
 
 And that's it!
