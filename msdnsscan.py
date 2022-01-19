@@ -9,7 +9,7 @@ import textwrap
 
 def options():
     opt_parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, epilog=textwrap.dedent(
-        '''Example: python3 msdnsscan.py -d example.com
+        '''Example: python3 msdnsscan.py -d example.com -a
 Example: python3 msdnsscan.py -d example.com -s
 '''))
     opt_parser.add_argument(
