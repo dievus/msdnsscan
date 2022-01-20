@@ -12,7 +12,8 @@ def options():
         '''Example: python3 msdnsscan.py -d example.com -a
 Example: python3 msdnsscan.py -d example.com -s
 '''))
-    opt_parser.add_argument(
+    requiredNamed = opt_parser.add_argument_group('required arguments')
+    requiredNamed.add_argument(
         '-d', '--domain', help='Specifies the domain name to test', required=True)
     opt_parser.add_argument(
         '-a', '--all', help='Scans for DNS records, zone transfers, and subdomains', action='store_true')
@@ -24,6 +25,8 @@ Example: python3 msdnsscan.py -d example.com -s
         '-z', '--zone', help='Includes check for zone transfers in scan', action='store_true')
     opt_parser.add_argument(
         '-w', '--wordlist', help='Use a wordlist for subdomains')
+
+    
     global args
     args = opt_parser.parse_args()
     if len(sys.argv) == 1:
@@ -52,7 +55,7 @@ def banner():
     print('██║ ╚═╝ ██║███████║██████╔╝██║ ╚████║███████║███████║╚██████╗██║  ██║██║ ╚████║')
     print('╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═══╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝\n')
     print('                        DNS and Subdomain Enumeration Tool                     ')
-    print('                                   Version 1.0.1                               ')
+    print('                                   Version 1.0.0                               ')
     print('                               A project by The Mayor                          ')
     print('                    python3 msdnsscan.py -d <domain> -a to start             \n' + Style.RESET_ALL)
     print("-" * 79)
