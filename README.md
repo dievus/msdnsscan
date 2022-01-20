@@ -29,5 +29,7 @@ Options include:
  ```-s, --subdom - checks for subdomains```
  
  ```-a, --all - runs all checks```
+ 
+ ```-w, --wordlist - uses user input wordlist instead of default```
 
 And that's it!
