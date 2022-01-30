@@ -5,6 +5,8 @@ from colorama import Fore, Style, init
 import requests
 import argparse
 import textwrap
+import os
+import urllib.request
 
 
 def options():
@@ -25,8 +27,9 @@ Example: python3 msdnsscan.py -d example.com -s
         '-z', '--zone', help='Includes check for zone transfers in scan', action='store_true')
     opt_parser.add_argument(
         '-w', '--wordlist', help='Use a wordlist for subdomains')
+    opt_parser.add_argument(
+        '-wl', '--weblist', help='Use a raw.githubusercontent.com wordlist for subdomains')
 
-    
     global args
     args = opt_parser.parse_args()
     if len(sys.argv) == 1:
@@ -61,7 +64,7 @@ def banner():
     print("-" * 79)
 
 
-ns_servers = []
+#ns_servers = []
 
 
 def main():
@@ -125,58 +128,45 @@ def zone_transfer():
 
 def subdom_finder():
     domain = args.domain
-    sub_counter = 0
-    subdomain_store = []
+
+    def try_statement():
+        subdomain_store = []
+        try:
+            subdomain_store.append(subdoms)
+            ip_value = dns.resolver.resolve(
+                f'{subdoms}.{domain}', 'A')
+            for ip_addr in ip_value:
+                print(success + f'{subdoms}.{domain} - {ip_addr}')
+        except requests.ConnectionError:
+            pass
+        except dns.resolver.NXDOMAIN:
+            pass
+        except dns.resolver.NoAnswer:
+            pass
+
     print(
         info + f'\n[info] Checking for subdomains. This may take some time depending on the wordlist.\n')
-    if args.wordlist is None:
-        for subdoms in subdomain_array:
-            url = f'http://{subdoms}.{domain}'
-            url_secure = f'https://{subdoms}.{domain}'
-            try:
-                requests.get(url)
-                subdomain_store.append(subdoms)
-                ip_value = dns.resolver.resolve(f'{subdoms}.{domain}', 'A')
-                for ip_addr in ip_value:
-                    print(success + f'{subdoms}.{domain} - {ip_addr}')
-                sub_counter = sub_counter + 1
-                exists = subdoms in subdomain_store
-                if exists != True:
-                    requests.get(url_secure)
-                    subdomain_store.append(subdoms)
-                    ip_value = dns.resolver.resolve(f'{subdoms}.{domain}', 'A')
-                    for ip_addr in ip_value:
-                        print(success + f'{subdoms}.{domain} - {ip_addr}')
-                        sub_counter = sub_counter + 1
-            except requests.ConnectionError:
-                pass
-    elif args.wordlist is not None:
+
+    if args.wordlist is not None:
         with open(args.wordlist, 'r+') as subdomain_list:
             for line in subdomain_list:
                 subdomains = line.split()
                 for subdoms in subdomains:
-                    url = f'http://{subdoms}.{domain}'
-                    url_secure = f'https://{subdoms}.{domain}'
-                    try:
-                        requests.get(url)
-                        subdomain_store.append(subdoms)
-                        ip_value = dns.resolver.resolve(
-                            f'{subdoms}.{domain}', 'A')
-                        for ip_addr in ip_value:
-                            print(success + f'{subdoms}.{domain} - {ip_addr}')
-                            sub_counter = sub_counter + 1
-                            exists = subdoms in subdomain_store
-                            if exists != True:
-                                requests.get(url_secure)
-                                subdomain_store.append(subdoms)
-                                ip_value = dns.resolver.resolve(
-                                    f'{subdoms}.{domain}', 'A')
-                                for ip_addr in ip_value:
-                                    print(
-                                        success + f'{subdoms}.{domain} - {ip_addr}')
-                                    sub_counter = sub_counter + 1
-                    except requests.ConnectionError:
-                        pass
+                    try_statement()
+    elif args.weblist is not None:
+        url = args.weblist
+        head, tail = os.path.split(url)
+        urllib.request.urlretrieve(url, f'{tail}')
+        print(f'[info] Reading subdomains from {url}.\n')
+        with open(f'{tail}', 'r+') as subdomain_list:
+            for line in subdomain_list:
+                subdomains = line.split()
+                for subdoms in subdomains:
+                    try_statement()
+        os.remove(f'{tail}')
+    else:
+        for subdoms in subdomain_array:
+            try_statement()
 
 
 def run():
@@ -187,9 +177,7 @@ def run():
     elif args.subdom:
         subdom_finder()
     elif args.all:
-        main()
-        zone_transfer()
-        subdom_finder()
+        main(),zone_transfer(),subdom_finder()
     else:
         print(
             fail + f'\n[syntax error] Please include options. Ex - python3 msdnsscan.py -d example.com --dns.\n')
@@ -208,3 +196,5 @@ if __name__ == "__main__":
         print(
             info + f'\n[warn] You either fat fingered this, or meant to do it. Either way, goodbye!\n')
         quit()
+    except urllib.error.HTTPError:
+        print(fail + '[warn] Wordlist invalid. Check URL and try again.')
