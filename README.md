@@ -31,5 +31,7 @@ Options include:
  ```-a, --all - runs all checks```
  
  ```-w, --wordlist - uses user input wordlist instead of default```
+ 
+ ```-wr, --write = writes valid subdomains to a text file```
 
 And that's it!
