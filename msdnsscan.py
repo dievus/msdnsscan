@@ -133,13 +133,13 @@ def subdom_finder():
     domain = args.domain
 
     def try_statement():
-        subdomain_store = []
+        # subdomain_store = []
         try:
-            subdomain_store.append(subdoms)
+            # subdomain_store.append(subdoms)
             ip_value = dns.resolver.resolve(
                 f'{subdoms}.{domain}', 'A')
             for ip_addr in ip_value:
-                print(success + f'{subdoms}.{domain} - {ip_addr}')
+                print(success + f'{subdoms}.{domain} - {ip_addr}')                
                 if args.write == True:
                     with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
                         sub_file.write(f'{subdoms}.{domain} - {ip_addr}\n')
@@ -148,6 +148,10 @@ def subdom_finder():
         except dns.resolver.NXDOMAIN:
             pass
         except dns.resolver.NoAnswer:
+            pass
+        except dns.resolver.NoNameservers:
+            pass
+        except dns.exception.Timeout:
             pass
 
     print(
