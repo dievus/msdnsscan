@@ -22,6 +22,7 @@ This will run the install script to add necessary dependencies to your system.
 ```python3 msdnsscan.py -d <domain> <options>```
 
 Options include:
+
 ```-a, --all - runs all checks```
 
  ```-dn, --dns - checks DNS records```
