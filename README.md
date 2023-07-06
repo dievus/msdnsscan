@@ -22,16 +22,24 @@ This will run the install script to add necessary dependencies to your system.
 ```python3 msdnsscan.py -d <domain> <options>```
 
 Options include:
+```-a, --all - runs all checks```
+
  ```-dn, --dns - checks DNS records```
  
  ```-z, --zone - checks Zone Transfer records```
+
+ ```-e, --email - checks Email records (DMARC, SPF, and DKIM)```
  
  ```-s, --subdom - checks for subdomains```
- 
- ```-a, --all - runs all checks```
- 
+  
  ```-w, --wordlist - uses user input wordlist instead of default```
  
- ```-wr, --write = writes valid subdomains to a text file```
+ ```-wl, --weblist - use a raw.githubusercontent.com wordlist for subdomains```
+
+ ```-tx, --test - write results of subdomain scan to a text file```
+
+ ```-md, --markdown - write results of subdomain scan to a markdown file for use with Xmind```
+
+ ```-il, --input - check subdomain against a list of IP addresses```
 
 And that's it!
