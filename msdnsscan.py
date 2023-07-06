@@ -4,11 +4,16 @@ import sys
 from colorama import Fore, Style, init
 import requests
 import argparse
+import threading
 import textwrap
 import os
+from datetime import datetime
 import urllib.request
+from pathlib import Path
+
 
 global subdom_file
+
 
 def options():
     opt_parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, epilog=textwrap.dedent(
@@ -27,10 +32,18 @@ Example: python3 msdnsscan.py -d example.com -s
     opt_parser.add_argument(
         '-z', '--zone', help='Includes check for zone transfers in scan', action='store_true')
     opt_parser.add_argument(
+        '-e', '--email', help='Includes check for email settings in scan', action='store_true')
+    opt_parser.add_argument(
         '-w', '--wordlist', help='Use a wordlist for subdomains')
     opt_parser.add_argument(
         '-wl', '--weblist', help='Use a raw.githubusercontent.com wordlist for subdomains')
-    opt_parser.add_argument('-wr', '--write', help='Write results of subdomain scan to a file', action='store_true')
+    opt_parser.add_argument(
+        '-tx', '--text', help='Write results of subdomain scan to a file', action='store_true')
+    opt_parser.add_argument(
+        '-md', '--markdown', help='Write results of subdomain scan to a markdown file for use with Xmind', action='store_true'
+    )
+    opt_parser.add_argument(
+        '-il', '--input', help='Check subdomain output against a list of IP addresses')
 
     global args
     args = opt_parser.parse_args()
@@ -51,6 +64,7 @@ subdomain_array = ['a', 'acceptatie', 'access', 'accounting', 'accounts', 'ad', 
                    'meet', 'member', 'members', 'mercury', 'meta', 'meta01', 'meta02', 'meta03', 'meta1', 'meta2', 'meta3', 'miembros', 'mijn', 'minerva', 'mirror', 'ml', 'mm', 'mob', 'mobil', 'mobile', 'monitor', 'monitoring', 'moodle', 'movil', 'mrtg', 'ms', 'msoid', 'mssql', 'munin', 'music', 'mx', 'mx-a', 'mx-b', 'mx0', 'mx01', 'mx02', 'mx03', 'mx1', 'mx2', 'mx3', 'my', 'mysql', 'mysql2', 'n', 'nagios', 'nas', 'nat', 'nelson', 'neon', 'net', 'netmail', 'netscaler', 'network', 'network-ip', 'networks', 'new', 'newmail', 'news', 'newsgroups', 'newsite', 'newsletter', 'nl', 'noc', 'novell', 'ns', 'ns0', 'ns01', 'ns02', 'ns03', 'ns1', 'ns10', 'ns11', 'ns12', 'ns2', 'ns3', 'ns4', 'ns5', 'ns6', 'ns7', 'ns8', 'nt', 'ntp', 'ntp1', 'o', 'oa', 'office', 'office2', 'old', 'oldmail', 'oldsite', 'oldwww', 'on', 'online', 'op', 'openbsd', 'operation', 'operations', 'ops', 'ora', 'oracle', 'origin', 'orion', 'os', 'osx', 'ou', 'outgoing', 'outlook', 'owa', 'ox', 'p', 'painel', 'panel', 'partner', 'partners', 'pay', 'payment', 'payments', 'pbx', 'pcanywhere', 'pda', 'pegasus', 'pendrell', 'personal', 'pgsql', 'phoenix', 'photo', 'photos', 'php', 'phpmyadmin', 'pm', 'pma', 'poczta', 'pop', 'pop3', 'portal', 'portfolio', 'post', 'postgres', 'postgresql', 'postman', 'postmaster', 'pp', 'ppp', 'pr', 'pre-prod', 'pre-production', 'preprod', 'press', 'preview', 'private', 'pro', 'prod', 'production', 'project', 'projects', 'promo', 'proxy', 'prueba', 'pruebas', 'pt', 'pub', 'public', 'q', 'qa', 'r', 'ra', 'radio', 'radius', 'ras', 'rdp', 'redirect', 'redmine', 'register', 'relay', 'remote', 'remote2', 'repo', 'report', 'reports', 'repos', 'research', 'resources', 'restricted', 'reviews', 'robinhood', 'root', 'router', 'rss', 'rt', 'rtmp', 'ru', 's', 's1', 's2', 's3', 's4', 'sa', 'sales', 'sample', 'samples', 'sandbox', 'sc', 'search', 'secure', 'security', 'seo', 'server', 'server1', 'server2', 'service', 'services', 'sftp', 'share', 'sharepoint', 'shell', 'shop', 'shopping', 'signup', 'sip', 'site', 'siteadmin', 'sitebuilder', 'sites', 'skype', 'sms', 'smtp', 'smtp1', 'smtp2', 'smtp3', 'snmp', 'social', 'software', 'solaris', 'soporte', 'sp', 'spam', 'speedtest', 'sport', 'sports', 'sql', 'sqlserver', 'squirrel', 'squirrelmail', 'ssh', 'ssl', 'sslvpn', 'sso', 'st', 'staff', 'stage', 'staging', 'start', 'stat', 'static', 'static1', 'static2', 'stats', 'status', 'storage', 'store', 'stream', 'streaming', 'student', 'sun', 'support', 'survey', 'sv', 'svn', 't', 'team', 'tech', 'telewerk', 'telework', 'temp', 'test', 'test1', 'test2', 'test3', 'testing', 'testsite', 'testweb', 'tfs', 'tftp', 'thumbs', 'ticket', 'tickets', 'time', 'tools', 'trac', 'track', 'tracker', 'tracking', 'train', 'training', 'travel', 'ts', 'tunnel', 'tutorials', 'tv', 'tw', 'u', 'uat', 'uk', 'unix', 'up', 'update', 'upload', 'uploads', 'us', 'user', 'users', 'v', 'v2', 'vc', 'ventas', 'video', 'videos', 'vip', 'virtual', 'vista', 'vle', 'vm', 'vms', 'vmware', 'vnc', 'vod', 'voip', 'vpn', 'vpn1', 'vpn2', 'vpn3', 'vps', 'vps1', 'vps2', 'w', 'w3', 'wap', 'wc', 'web', 'web0', 'web01', 'web02', 'web03', 'web1', 'web2', 'web3', 'web4', 'web5', 'webadmin', 'webcam', 'webconf', 'webct', 'webdb', 'webdisk', 'weblog', 'webmail', 'webmail2', 'webmaster', 'webmin', 'webservices', 'webstats', 'webstore', 'whm', 'wifi', 'wiki', 'win', 'win32', 'windows', 'wordpress', 'work', 'wp', 'ws', 'wsus', 'ww', 'ww0', 'ww01', 'ww02', 'ww03', 'ww1', 'ww2', 'ww3', 'www', 'www-test', 'www0', 'www01', 'www02', 'www03', 'www1', 'www2', 'www3', 'www4', 'www5', 'www6', 'www7', 'wwwm', 'wwwold', 'wwww', 'x', 'xml', 'zabbix', 'zeus', 'zimbra']
 subdom_file = []
 
+
 def banner():
     print(Fore.YELLOW + Style.BRIGHT + "")
     print('███╗   ███╗███████╗██████╗ ███╗   ██╗███████╗███████╗ ██████╗ █████╗ ███╗   ██╗')
@@ -60,10 +74,10 @@ def banner():
     print('██║ ╚═╝ ██║███████║██████╔╝██║ ╚████║███████║███████║╚██████╗██║  ██║██║ ╚████║')
     print('╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═══╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝\n')
     print('                        DNS and Subdomain Enumeration Tool                     ')
-    print('                                   Version 1.0.0                               ')
+    print('                                   Version 1.1.0                               ')
     print('                               A project by The Mayor                          ')
     print('                    python3 msdnsscan.py -d <domain> -a to start             \n')
-    print('        Recommend the Bitquark 100000 Wordlist at https://upto.site/717c9    \n'+ Style.RESET_ALL) 
+    print('        Recommend the Bitquark 100000 Wordlist at https://upto.site/717c9    \n' + Style.RESET_ALL)
     print("-" * 79)
 
 
@@ -105,7 +119,8 @@ def zone_transfer():
     address = domain
     name_server = dns.resolver.resolve(address, 'NS')
     print(
-        info + f'\n[info] Testing name servers for zone transfers. This may take a minute.')
+        info + f'\nZone Transfer Records - This may take a minute')
+    print('-' * 50)
     for server in name_server:
         ip_value = dns.resolver.resolve(server.target, 'A')
         for ip_addr in ip_value:
@@ -128,6 +143,61 @@ def zone_transfer():
             except Exception:
                 pass
 
+def email():
+    domain = args.domain
+    address = domain
+    dmarc_val = 0
+    spf_val = 0
+    dkim_val = 0
+    records = []
+    print(info + f'\nEmail Records')
+    print('-' * 50)
+    try:
+        dmarc_data = dns.resolver.resolve(f'_dmarc.{address}', 'TXT')
+        for dmarc_response in dmarc_data:
+            if 'DMARC1' in str(dmarc_response):
+                records.append(success + f'[dmarc record] {dmarc_response}')
+                # print(success + f'[dmarc record] {dmarc_response}')
+                dmarc_val += 1
+    except dns.resolver.NXDOMAIN:
+        # print(info + f'\n[info] DMARC data not found for {domain}')
+        pass
+    try:
+        spf_data = dns.resolver.resolve(domain, 'TXT')
+        for spf_response in spf_data:
+            if 'spf1' in str(spf_response):
+                # print(success + f'\n[spf record] {spf_response}')
+                records.append(success + f'[spf record] {spf_response}')
+                spf_val += 1
+    except dns.resolver.NXDOMAIN:
+        # print(info + f'\n[info] SPF data not found for {domain}')
+        pass
+    selectors = ["2013-03", "a2hosting","20161025", "alfa", "beta", "cm", "default", "delta", "dkim", "google",
+        "k1", "k2", "k3", "k4", "k5", "m1", "m2", "m3", "m4", "m5", "mail", "mandrill", "my1",
+        "my2", "my3", "my4", "my5", "pf2014", "pm", "proddkim1024", "rit1608", "s1", "s1024",
+        "s2", "s2048", "s5", "s512", "s7", "s768", "selector1", "selector1-ebsmd-com0i",
+        "selector1-wwecorp-com", "selector2", "smtp", "smtpapi", "test", "zendesk", "zendesk1",
+        "ml", "consulenze"]
+    for selector in selectors:
+        try:
+            dkim_data = dns.resolver.resolve(f'{selector}._domainkey.{domain}', 'TXT')
+            for dkim_response in dkim_data:
+                if 'DKIM1' in str(dkim_response):
+                    # print(success + f'[dkim record] {dkim_response}')
+                    records.append(success + f'[dkim record] {dkim_response}')
+                    dkim_val += 1
+        except dns.resolver.NXDOMAIN:
+            # print(fail + f'\n[warn] DKIM data not found for {domain}')
+            pass
+    for success_val in records:
+        print(success_val)
+    print('\n')
+    if dmarc_val == 0:    
+        print(info + f'[info] DMARC data not found for {domain}')
+    if spf_val == 0:
+        print(info + f'[info] SPF data not found for {domain}')
+    if dkim_val == 0:
+        print(info + f'[info] DKIM data not found for {domain}')
 
 def subdom_finder():
     domain = args.domain
@@ -139,10 +209,24 @@ def subdom_finder():
             ip_value = dns.resolver.resolve(
                 f'{subdoms}.{domain}', 'A')
             for ip_addr in ip_value:
-                print(success + f'{subdoms}.{domain} - {ip_addr}')                
-                if args.write == True:
-                    with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
-                        sub_file.write(f'{subdoms}.{domain} - {ip_addr}\n')
+                if args.input is not None:
+                    for ip_check in inscope_store:
+                        if str(ip_addr) == str(ip_check):
+                            print(
+                                success + f'{subdoms}.{domain} - {ip_addr}')
+                        if args.text == True:
+                            if str(ip_addr) == str(ip_check):
+                                with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
+                                    sub_file.write(
+                                        f'{subdoms}.{domain} - {ip_addr}\n')
+                        if args.markdown == True:
+                            if str(ip_addr) == str(ip_check):
+                                with open(f'{args.domain}_markdown.md', 'a') as md_file:
+                                    md_file.write(
+                                        f'## {subdoms}.{domain} - {ip_addr}\n')
+                else:
+                    print(success + f'{subdoms}.{domain} - {ip_addr}')
+
         except requests.ConnectionError:
             pass
         except dns.resolver.NXDOMAIN:
@@ -156,9 +240,18 @@ def subdom_finder():
 
     print(
         info + f'\n[info] Checking for subdomains. This may take some time depending on the wordlist.\n')
-
+    if args.input is not None:
+        inscope_store = []
+        lines = Path(args.input).read_text().splitlines()
+        for line in lines:
+            inscope_store.append(f'{line}')
     if args.wordlist is not None:
         with open(args.wordlist, 'r+') as subdomain_list:
+            if args.markdown:
+                with open(f'{args.domain}_markdown.md', 'a') as md_file:
+                    header_info = f'# {args.domain}\n'
+                    md_file.write(header_info)
+                    md_file.close()
             for line in subdomain_list:
                 subdomains = line.split()
                 for subdoms in subdomains:
@@ -170,6 +263,11 @@ def subdom_finder():
         print(f'[info] Reading subdomains from {url}.\n')
         subdom_file.append(tail)
         with open(f'{tail}', 'r+') as subdomain_list:
+            if args.markdown:
+                with open(f'{args.domain}_markdown.md', 'a') as md_file:
+                    header_info = f'# {args.domain}\n'
+                    md_file.write(header_info)
+                    md_file.close()
             for line in subdomain_list:
                 subdomains = line.split()
                 for subdoms in subdomains:
@@ -187,8 +285,11 @@ def run():
         zone_transfer()
     elif args.subdom:
         subdom_finder()
+    elif args.email:
+        email()
+
     elif args.all:
-        main(),zone_transfer(),subdom_finder()
+        main(), email(), zone_transfer(), subdom_finder() 
     else:
         print(
             fail + f'\n[syntax error] Please include options. Ex - python3 msdnsscan.py -d example.com --dns.\n')
@@ -202,7 +303,12 @@ if __name__ == "__main__":
         style()
         banner()
         options()
+        t1 = datetime.now()
+        print('Starting scan at ' + str(t1))
         run()
+        t2 = datetime.now()
+        total_time = t2 - t1
+        print('Scan completed in ' + str(total_time))
     except KeyboardInterrupt:
         print(
             info + f'\n[warn] You either fat fingered this, or meant to do it. Either way, goodbye!\n')
