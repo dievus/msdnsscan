@@ -157,20 +157,18 @@ def email():
         for dmarc_response in dmarc_data:
             if 'DMARC1' in str(dmarc_response):
                 records.append(success + f'[dmarc record] {dmarc_response}')
-                # print(success + f'[dmarc record] {dmarc_response}')
                 dmarc_val += 1
     except dns.resolver.NXDOMAIN:
-        # print(info + f'\n[info] DMARC data not found for {domain}')
         pass
     try:
         spf_data = dns.resolver.resolve(domain, 'TXT')
         for spf_response in spf_data:
             if 'spf1' in str(spf_response):
-                # print(success + f'\n[spf record] {spf_response}')
                 records.append(success + f'[spf record] {spf_response}')
                 spf_val += 1
     except dns.resolver.NXDOMAIN:
-        # print(info + f'\n[info] SPF data not found for {domain}')
+        pass
+    except dns.resolver.Timeout:
         pass
     selectors = ["2013-03", "a2hosting","20161025", "alfa", "beta", "cm", "default", "delta", "dkim", "google",
         "k1", "k2", "k3", "k4", "k5", "m1", "m2", "m3", "m4", "m5", "mail", "mandrill", "my1",
@@ -183,15 +181,16 @@ def email():
             dkim_data = dns.resolver.resolve(f'{selector}._domainkey.{domain}', 'TXT')
             for dkim_response in dkim_data:
                 if 'DKIM1' in str(dkim_response):
-                    # print(success + f'[dkim record] {dkim_response}')
                     records.append(success + f'[dkim record] {dkim_response}')
                     dkim_val += 1
         except dns.resolver.NXDOMAIN:
-            # print(fail + f'\n[warn] DKIM data not found for {domain}')
+            pass
+        except dns.resolver.NoAnswer:
+            pass
+        except dns.resolver.Timeout:
             pass
     for success_val in records:
         print(success_val)
-    print('\n')
     if dmarc_val == 0:    
         print(info + f'[info] DMARC data not found for {domain}')
     if spf_val == 0:
@@ -219,11 +218,25 @@ def subdom_finder():
                                 with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
                                     sub_file.write(
                                         f'{subdoms}.{domain} - {ip_addr}\n')
-                        if args.markdown == True:
+                        if args.markdown == True and ip_check:
                             if str(ip_addr) == str(ip_check):
                                 with open(f'{args.domain}_markdown.md', 'a') as md_file:
                                     md_file.write(
                                         f'## {subdoms}.{domain} - {ip_addr}\n')
+                elif args.input is None:
+                    if str(ip_addr):
+                        print(
+                            success + f'{subdoms}.{domain} - {ip_addr}')
+                    if args.text == True:
+                        if str(ip_addr):
+                            with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
+                                sub_file.write(
+                                    f'{subdoms}.{domain} - {ip_addr}\n')
+                    if args.markdown:
+                        if str(ip_addr):
+                            with open(f'{args.domain}_markdown.md', 'a') as md_file:
+                                md_file.write(
+                                    f'## {subdoms}.{domain} - {ip_addr}\n')
                 else:
                     print(success + f'{subdoms}.{domain} - {ip_addr}')
 
