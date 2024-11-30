@@ -4,21 +4,19 @@ import sys
 from colorama import Fore, Style, init
 import requests
 import argparse
-import threading
 import textwrap
 import os
 from datetime import datetime
 import urllib.request
 from pathlib import Path
-
-
-global subdom_file
+import concurrent.futures
 
 
 def options():
     opt_parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, epilog=textwrap.dedent(
-        '''Example: python3 msdnsscan.py -d example.com -a
+        '''Example: python3 msdnsscan.py -d example.com -a 
 Example: python3 msdnsscan.py -d example.com -s
+
 '''))
     requiredNamed = opt_parser.add_argument_group('required arguments')
     requiredNamed.add_argument(
@@ -44,7 +42,9 @@ Example: python3 msdnsscan.py -d example.com -s
     )
     opt_parser.add_argument(
         '-il', '--input', help='Check subdomain output against a list of IP addresses')
-
+    opt_parser.add_argument(
+        '-c', '--concurrent', help='Number of concurrent requests to run. DEFAULT - 10. Anything greater can be unstable1', required=False
+    )
     global args
     args = opt_parser.parse_args()
     if len(sys.argv) == 1:
@@ -53,9 +53,8 @@ Example: python3 msdnsscan.py -d example.com -s
 
 
 def style():
-    global success, info, fail
-    success, info, fail = Fore.GREEN + Style.BRIGHT, Fore.YELLOW + \
-        Style.BRIGHT, Fore.RED + Style.BRIGHT
+    global success, info, fail, servertype
+    success, info, fail, servertype = Fore.GREEN + Style.BRIGHT, Fore.YELLOW + Style.BRIGHT, Fore.RED + Style.BRIGHT, Fore.WHITE + Style.BRIGHT
 
 
 record_types = ['A', 'AAAA', 'NS', 'CNAME', 'MX', 'PTR', 'SOA', 'SRV',
@@ -74,15 +73,11 @@ def banner():
     print('██║ ╚═╝ ██║███████║██████╔╝██║ ╚████║███████║███████║╚██████╗██║  ██║██║ ╚████║')
     print('╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═══╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝\n')
     print('                        DNS and Subdomain Enumeration Tool                     ')
-    print('                                   Version 1.1.0                               ')
+    print('                                   Version 2.0.0                              ')
     print('                               A project by The Mayor                          ')
     print('                    python3 msdnsscan.py -d <domain> -a to start             \n')
-    print('        Recommend the Bitquark 100000 Wordlist at https://upto.site/717c9    \n' + Style.RESET_ALL)
+    print('          Recommend the Bitquark 100000 Wordlist in the Wordlist Directory    \n' + Style.RESET_ALL)
     print("-" * 79)
-
-
-#ns_servers = []
-
 
 def main():
     try:
@@ -117,32 +112,34 @@ def main():
 def zone_transfer():
     domain = args.domain
     address = domain
-    name_server = dns.resolver.resolve(address, 'NS')
-    print(
-        info + f'\nZone Transfer Records - This may take a minute')
-    print('-' * 50)
-    for server in name_server:
-        ip_value = dns.resolver.resolve(server.target, 'A')
-        for ip_addr in ip_value:
-            try:
-                z_transfer = dns.zone.from_xfr(
-                    dns.query.xfr(str(ip_addr), address))
-                print(
-                    info + f'\nZone transfer records for {server} at {ip_addr}')
-                print('-' * 60)
-                for z_host in z_transfer:
-                    print(success + z_host.to_text())
-            except dns.xfr.TransferError:
-                print(info + f'\n[info] Zone Transfer refused for {server}')
-                pass
-            except TimeoutError:
-                print(info + f'\n[info] Zone Transfer refused for {server}')
-                pass
-            except dns.resolver.NoAnswer:
-                pass
-            except Exception:
-                pass
-
+    try:
+        name_server = dns.resolver.resolve(address, 'NS')
+        print(
+            info + f'\nZone Transfer Records - This may take a minute')
+        print('-' * 50)
+        for server in name_server:
+            ip_value = dns.resolver.resolve(server.target, 'A')
+            for ip_addr in ip_value:
+                try:
+                    z_transfer = dns.zone.from_xfr(
+                        dns.query.xfr(str(ip_addr), address))
+                    print(
+                        info + f'\nZone transfer records for {server} at {ip_addr}')
+                    print('-' * 60)
+                    for z_host in z_transfer:
+                        print(success + z_host.to_text())
+                except dns.xfr.TransferError:
+                    print(info + f'\n[info] Zone Transfer refused for {server}')
+                    pass
+                except TimeoutError:
+                    print(info + f'\n[info] Zone Transfer refused for {server}')
+                    pass
+                except dns.resolver.NoAnswer:
+                    pass
+                except Exception:
+                    pass
+    except dns.resolver.NoAnswer:
+        pass
 def email():
     domain = args.domain
     address = domain
@@ -160,6 +157,8 @@ def email():
                 dmarc_val += 1
     except dns.resolver.NXDOMAIN:
         pass
+    except dns.resolver.NoAnswer:
+        pass
     try:
         spf_data = dns.resolver.resolve(domain, 'TXT')
         for spf_response in spf_data:
@@ -169,6 +168,8 @@ def email():
     except dns.resolver.NXDOMAIN:
         pass
     except dns.resolver.Timeout:
+        pass
+    except dns.resolver.NoAnswer:
         pass
     selectors = ["2013-03", "a2hosting","20161025", "alfa", "beta", "cm", "default", "delta", "dkim", "google",
         "k1", "k2", "k3", "k4", "k5", "m1", "m2", "m3", "m4", "m5", "mail", "mandrill", "my1",
@@ -198,66 +199,123 @@ def email():
     if dkim_val == 0:
         print(info + f'[info] DKIM data not found for {domain}')
 
+def subdom_requestor(ip_addr, subdoms, domain):
+    possible_headers = ['Server', 'X-Powered-By']
+    server_headers = []
+    url_request = requests.get(f'\nhttps://{subdoms}.{domain}')
+    if url_request.status_code == 200:
+        status_code = success + f'[{url_request.status_code}]'
+        markdown_status_code = f'[{url_request.status_code}]'
+    elif url_request.status_code == 300 or url_request.status_code == 301 or  url_request.status_code == 302:
+        status_code = info + f'[{url_request.status_code}]'
+        markdown_status_code = f'[{url_request.status_code}]'
+    else: 
+        status_code = fail + f'[{url_request.status_code}]'     
+        markdown_status_code = f'[{url_request.status_code}]'
+    for possible_header in possible_headers:
+        server_header = url_request.headers.get(possible_header)
+        if server_header == None:
+            pass
+        else:
+            server_headers.append(server_header)
+    if server_headers == None:
+        print(success + f'{subdoms}.{domain} - {ip_addr} - {status_code}')
+        if args.text == True:
+            if str(ip_addr):
+                with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
+                    sub_file.write(
+                        f'{subdoms}.{domain} - {ip_addr}\n')
+        if args.markdown:
+            if str(ip_addr):
+                with open(f'{args.domain}_markdown.md', 'a') as md_file:
+                    md_file.write(
+                        f'## {subdoms}.{domain} - {ip_addr}\n')
+                    md_file.write(f'### {markdown_status_code} - {print_header}\n')
+    elif len(server_headers) == 1 and server_headers != 'None':
+        print_header = server_header
+        print(
+        success + f'{subdoms}.{domain} - {ip_addr} - {status_code}' + servertype + f' [{server_headers[0]}]')
+        if args.text == True:
+            if str(ip_addr):
+                with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
+                    sub_file.write(
+                        f'{subdoms}.{domain} - {ip_addr} - [{server_headers[0]}]\n')
+        if args.markdown:
+            if str(ip_addr):
+                with open(f'{args.domain}_markdown.md', 'a') as md_file:
+                    md_file.write(
+                        f'## {subdoms}.{domain} - {ip_addr}\n')
+                    md_file.write(f'### {markdown_status_code}  - [{server_headers[0]}]\n')
+    elif len(server_headers) == 2 and server_headers != 'None':
+        print(
+        success + f'{subdoms}.{domain} - {ip_addr} - {status_code}' + servertype + f' [{server_headers[0]}]/[{server_headers[1]}]')
+        if args.text == True:
+            if str(ip_addr):
+                with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
+                    sub_file.write(
+                        f'{subdoms}.{domain} - {ip_addr} - [{server_headers[0]}]/[{server_headers[1]}]\n')
+        if args.markdown:
+            if str(ip_addr):
+                with open(f'{args.domain}_markdown.md', 'a') as md_file:
+                    md_file.write(
+                        f'## {subdoms}.{domain} - {ip_addr}\n')
+                    md_file.write(f'### {markdown_status_code} - [{server_headers[0]}]/[{server_headers[1]}]\n')
+    else:
+        pass             
+    server_headers = []
+
+def try_statement(subdoms, domain, inscope_store):
+    try:
+        ip_value = dns.resolver.resolve(f'{subdoms}.{domain}', 'A')
+        for ip_addr in ip_value:
+            if args.input is not None:
+                for ip_check in inscope_store:
+                    if str(ip_addr) != str(ip_check):
+                        pass
+                    else:
+                        subdom_requestor(ip_addr, subdoms, domain)
+            elif args.input is None:
+                subdom_requestor(ip_addr, subdoms, domain)
+
+    except (requests.ConnectionError, dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, 
+            dns.resolver.NoNameservers, dns.exception.Timeout, UnboundLocalError, 
+            requests.exceptions.TooManyRedirects):
+        pass
+
+def process_subdomain(subdomains, domain, inscope_store):
+    if args.concurrent:
+        concurrent_requests = int(args.concurrent)
+    else:
+        concurrent_requests = 10
+    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
+        futures = []
+        try:
+            for subdoms in subdomains:
+                future = executor.submit(try_statement, subdoms, domain, inscope_store)
+                futures.append(future)
+
+            # Handles keyboard interrupts
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except KeyboardInterrupt:
+                    for task in futures:
+                        task.cancel()
+                    break
+        except KeyboardInterrupt:
+            for task in futures:
+                task.cancel()
+            raise
+
 def subdom_finder():
     domain = args.domain
-
-    def try_statement():
-        # subdomain_store = []
-        try:
-            # subdomain_store.append(subdoms)
-            ip_value = dns.resolver.resolve(
-                f'{subdoms}.{domain}', 'A')
-            for ip_addr in ip_value:
-                if args.input is not None:
-                    for ip_check in inscope_store:
-                        if str(ip_addr) == str(ip_check):
-                            print(
-                                success + f'{subdoms}.{domain} - {ip_addr}')
-                        if args.text == True:
-                            if str(ip_addr) == str(ip_check):
-                                with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
-                                    sub_file.write(
-                                        f'{subdoms}.{domain} - {ip_addr}\n')
-                        if args.markdown == True and ip_check:
-                            if str(ip_addr) == str(ip_check):
-                                with open(f'{args.domain}_markdown.md', 'a') as md_file:
-                                    md_file.write(
-                                        f'## {subdoms}.{domain} - {ip_addr}\n')
-                elif args.input is None:
-                    if str(ip_addr):
-                        print(
-                            success + f'{subdoms}.{domain} - {ip_addr}')
-                    if args.text == True:
-                        if str(ip_addr):
-                            with open(f'{args.domain}_subdomains.txt', 'a') as sub_file:
-                                sub_file.write(
-                                    f'{subdoms}.{domain} - {ip_addr}\n')
-                    if args.markdown:
-                        if str(ip_addr):
-                            with open(f'{args.domain}_markdown.md', 'a') as md_file:
-                                md_file.write(
-                                    f'## {subdoms}.{domain} - {ip_addr}\n')
-                else:
-                    print(success + f'{subdoms}.{domain} - {ip_addr}')
-
-        except requests.ConnectionError:
-            pass
-        except dns.resolver.NXDOMAIN:
-            pass
-        except dns.resolver.NoAnswer:
-            pass
-        except dns.resolver.NoNameservers:
-            pass
-        except dns.exception.Timeout:
-            pass
-
-    print(
-        info + f'\n[info] Checking for subdomains. This may take some time depending on the wordlist.\n')
+    print(info + f'\n[info] Checking for subdomains. This may take some time depending on the wordlist.\n')
+    inscope_store = []
     if args.input is not None:
-        inscope_store = []
         lines = Path(args.input).read_text().splitlines()
         for line in lines:
             inscope_store.append(f'{line}')
+    
     if args.wordlist is not None:
         with open(args.wordlist, 'r+') as subdomain_list:
             if args.markdown:
@@ -265,10 +323,8 @@ def subdom_finder():
                     header_info = f'# {args.domain}\n'
                     md_file.write(header_info)
                     md_file.close()
-            for line in subdomain_list:
-                subdomains = line.split()
-                for subdoms in subdomains:
-                    try_statement()
+            subdomains = [line.strip() for line in subdomain_list]
+            process_subdomain(subdomains, domain, inscope_store)
     elif args.weblist is not None:
         url = args.weblist
         head, tail = os.path.split(url)
@@ -281,15 +337,11 @@ def subdom_finder():
                     header_info = f'# {args.domain}\n'
                     md_file.write(header_info)
                     md_file.close()
-            for line in subdomain_list:
-                subdomains = line.split()
-                for subdoms in subdomains:
-                    try_statement()
+            subdomains = [line.strip() for line in subdomain_list]
+            process_subdomain(subdomains, domain, inscope_store)
         os.remove(f'{tail}')
     else:
-        for subdoms in subdomain_array:
-            try_statement()
-
+        process_subdomain(subdomain_array, domain, inscope_store)
 
 def run():
     if args.dns:
@@ -300,7 +352,6 @@ def run():
         subdom_finder()
     elif args.email:
         email()
-
     elif args.all:
         main(), email(), zone_transfer(), subdom_finder() 
     else:
@@ -325,7 +376,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(
             info + f'\n[warn] You either fat fingered this, or meant to do it. Either way, goodbye!\n')
-        # Cleanup subdomain file left here with interrupt
         for i in subdom_file:
             os.remove(i)
         quit()
