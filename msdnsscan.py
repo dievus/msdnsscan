@@ -43,7 +43,7 @@ Example: python3 msdnsscan.py -d example.com -s
     opt_parser.add_argument(
         '-il', '--input', help='Check subdomain output against a list of IP addresses')
     opt_parser.add_argument(
-        '-c', '--concurrent', help='Number of concurrent requests to run. DEFAULT - 10. Anything greater can be unstable1', required=False
+        '-c', '--concurrent', help='Number of concurrent requests to run. DEFAULT - 10. Anything greater can be unstable', required=False
     )
     global args
     args = opt_parser.parse_args()
