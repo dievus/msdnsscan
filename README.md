@@ -43,4 +43,6 @@ Options include:
 
  ```-il, --input - check subdomain against a list of IP addresses```
 
+ ```-c, --concurrent (requests) - Number of concurrent requests to run. Defaults to 10. Anything greater than 10 can be unstable```
+
 And that's it!
